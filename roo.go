@@ -51,12 +51,12 @@ func main() {
   {
 // env
     Name:  "env",
-    Usage: "control environment variables",
+    Usage: "Control environment variables for this app",
     Flags:  *appBasedFlags(),
     Subcommands: []cli.Command{
       {
         Name:  "set",
-        Usage: "[set ENV] - set the environment variable",
+        Usage: "[set ENV] Set the environment variable for this app",
         Action: func(c *cli.Context) {
           f := openPath("-", os.Open, os.Stdin)
           path := c.Args().First()
@@ -70,7 +70,7 @@ func main() {
       },
       {
         Name:  "unset",
-        Usage: "[unset ENV] - unset the environment variable",
+        Usage: "[unset ENV] Unset the environment variable for this app",
         Action: func(c *cli.Context) {
           path := c.Args().First()
 
@@ -80,7 +80,7 @@ func main() {
       },
       {
         Name:  "get",
-        Usage: "get the environment variable",
+        Usage: "[get ENV] Get the environment variable for this app",
         Action: func(c *cli.Context) {
           out := openPath("-", os.Create, os.Stdout)
           defer out.Close()
@@ -94,7 +94,7 @@ func main() {
       },
       {
         Name:  "ls",
-        Usage: "list the environment variable",
+        Usage: "[ls] List the environment variables for this app",
         Action: func(c *cli.Context) {
           manager := envManager()
           files, err := manager.List("*")
@@ -110,11 +110,11 @@ func main() {
 // lockbox
   {
     Name:      "lockbox",
-    Usage:     "a small secure storage",
+    Usage:     "Store files in secure storage for up to 5 days",
     Subcommands: []cli.Command{
       {
         Name:  "store",
-        Usage: "store the data or file securely",
+        Usage: "[store FILE] Store the data or file securely in a lockbox. This results in an ID for use with 'get'",
         Action: func(c *cli.Context) {
           file := c.Args().First()
           f := openPath(file, os.Open, os.Stdin)
@@ -122,28 +122,20 @@ func main() {
           path := uuid.NewV4().String()
           defer f.Close()
 
-          s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-          s.Suffix = " Storing file"
-          s.Start()
+          spinner := gSpinner(" Storing File")
 
-          done := make(chan bool)
+          manager := lockboxManager()
+          err := manager.Upload(path, f)
+          spinner.Stop()
 
-          go func() {
-            manager := lockboxManager()
-            err := manager.Upload(path, f)
-            if err != nil { log.Fatal(err) }
-            done <- true
-          }()
-
-          <-done
-
-          s.Stop()
-          fmt.Printf("%s\n", path)
+          if err != nil { log.Fatal(err) }
+          fmt.Fprintf(os.Stderr, "\r✔ Stored file \n")
+          fmt.Printf("%s", path)
         },
       },
       {
         Name:  "get",
-        Usage: "get the lockbox data",
+        Usage: "[get ID] Retrieve the lockbox data",
         Action: func(c *cli.Context) {
           out := openPath("-", os.Create, os.Stdout)
           defer out.Close()
@@ -215,4 +207,13 @@ func openPath(file string, o func(string) (*os.File, error), def *os.File) *os.F
     log.Fatal(err)
   }
   return f
+}
+
+func gSpinner(text string) *spinner.Spinner {
+  s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+  s.Suffix = text
+  s.Writer = os.Stderr
+  s.Start()
+
+  return s;
 }
