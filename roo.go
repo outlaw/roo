@@ -11,24 +11,50 @@ import (
   "github.com/aws/aws-sdk-go/service/kms"
   "github.com/aws/aws-sdk-go/aws/session"
   "github.com/aws/aws-sdk-go/service/s3"
+  "github.com/satori/go.uuid"
+  "github.com/spf13/viper"
 )
+
+func appBasedFlags() *[]cli.Flag {
+    return &[]cli.Flag{
+      cli.StringFlag{
+        Name:  "app, a",
+        Value: "",
+        Usage: "the Application",
+      },
+
+      cli.StringFlag{
+        Name:  "environment, e",
+        Value: "",
+        Usage: "the Environment for the Application",
+      },
+    }
+}
 
 func main() {
   app := cli.NewApp()
   app.Name = "roo"
   app.Usage = ""
 
-  // deploy
-  // env
+  viper.SetEnvPrefix("roo")
+  viper.BindEnv("lockbox_s3_path")
+  viper.BindEnv("env_s3_path")
+
+  viper.SetDefault("lockbox_s3_path", "s3://hooroo-lockbox")
+  viper.SetDefault("lockbox_master_key", viper.GetString("env_master_key"))
+  viper.SetDefault("env_s3_path", "s3://hooroo-test")
+  viper.AutomaticEnv()
 
   app.Commands = []cli.Command{
   {
-    Name:      "env",
-    Usage:     "control environment variables",
+// env
+    Name:  "env",
+    Usage: "control environment variables",
+    Flags:  *appBasedFlags(),
     Subcommands: []cli.Command{
       {
         Name:  "set",
-        Usage: "set the environment variable",
+        Usage: "[set ENV] - set the environment variable",
         Action: func(c *cli.Context) {
           f := openPath("-", os.Open, os.Stdin)
           path := c.Args().First()
@@ -38,6 +64,16 @@ func main() {
           if err := manager.Upload(path, f); err != nil {
             log.Fatal(err)
           }
+        },
+      },
+      {
+        Name:  "unset",
+        Usage: "[unset ENV] - unset the environment variable",
+        Action: func(c *cli.Context) {
+          path := c.Args().First()
+
+          manager := envManager()
+          if err := manager.Rm(path); err != nil { log.Fatal(err) }
         },
       },
       {
@@ -69,17 +105,52 @@ func main() {
       },
     },
   },
+// lockbox
+  {
+    Name:      "lockbox",
+    Usage:     "a small secure storage",
+    Subcommands: []cli.Command{
+      {
+        Name:  "store",
+        Usage: "store the data or file securely",
+        Action: func(c *cli.Context) {
+          f := openPath("-", os.Open, os.Stdin)
+
+          path := uuid.NewV4().String()
+          defer f.Close()
+
+          manager := lockboxManager()
+          if err := manager.Upload(path, f); err != nil { log.Fatal(err) }
+          fmt.Printf("%s\n", path)
+        },
+      },
+      {
+        Name:  "get",
+        Usage: "get the lockbox data",
+        Action: func(c *cli.Context) {
+          out := openPath("-", os.Create, os.Stdout)
+          defer out.Close()
+
+          path := c.Args().First()
+          manager := lockboxManager()
+          actual, err := manager.Download([]string{path});
+          if err != nil { log.Fatal(err) }
+          out.Write(actual[path])
+        },
+      },
+    },
+  },
   }
 
   app.Run(os.Args)
 }
 
-func secretManager() *sneaker.Manager {
-  return createManager(os.Getenv("ROO_SECRET_S3_PATH"), os.Getenv("ROO_SECRET_MASTER_KEY"))
+func lockboxManager() *sneaker.Manager {
+  return createManager(viper.GetString("lockbox_s3_path"), viper.GetString("lockbox_master_key"))
 }
 
 func envManager() *sneaker.Manager {
-  return createManager(os.Getenv("ROO_ENV_S3_PATH"), os.Getenv("ROO_ENV_MASTER_KEY"))
+  return createManager(viper.GetString("env_s3_path"), viper.GetString("env_master_key"))
 }
 
 func createManager(s3Url string, keyId string) *sneaker.Manager {
