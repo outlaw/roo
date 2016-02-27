@@ -1,6 +1,7 @@
 package main
 
 import (
+  "time"
   "os"
   "log"
   "net/url"
@@ -13,6 +14,7 @@ import (
   "github.com/aws/aws-sdk-go/service/s3"
   "github.com/satori/go.uuid"
   "github.com/spf13/viper"
+  "github.com/briandowns/spinner"
 )
 
 func appBasedFlags() *[]cli.Flag {
@@ -37,13 +39,13 @@ func main() {
   app.Usage = ""
 
   viper.SetEnvPrefix("roo")
+  viper.AutomaticEnv()
   viper.BindEnv("lockbox_s3_path")
   viper.BindEnv("env_s3_path")
 
   viper.SetDefault("lockbox_s3_path", "s3://hooroo-lockbox")
   viper.SetDefault("lockbox_master_key", viper.GetString("env_master_key"))
   viper.SetDefault("env_s3_path", "s3://hooroo-test")
-  viper.AutomaticEnv()
 
   app.Commands = []cli.Command{
   {
@@ -114,13 +116,28 @@ func main() {
         Name:  "store",
         Usage: "store the data or file securely",
         Action: func(c *cli.Context) {
-          f := openPath("-", os.Open, os.Stdin)
+          file := c.Args().First()
+          f := openPath(file, os.Open, os.Stdin)
 
           path := uuid.NewV4().String()
           defer f.Close()
 
-          manager := lockboxManager()
-          if err := manager.Upload(path, f); err != nil { log.Fatal(err) }
+          s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+          s.Suffix = " Storing file"
+          s.Start()
+
+          done := make(chan bool)
+
+          go func() {
+            manager := lockboxManager()
+            err := manager.Upload(path, f)
+            if err != nil { log.Fatal(err) }
+            done <- true
+          }()
+
+          <-done
+
+          s.Stop()
           fmt.Printf("%s\n", path)
         },
       },
