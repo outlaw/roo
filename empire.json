@@ -1,0 +1,665 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Example ECS cluster for Empire",
+  "Parameters": {
+    "InternalDomain": {
+      "Type": "AWS::Route53::HostedZone::Id",
+      "Description": "Inernal domain to use"
+    },
+    "InstanceType": {
+      "Type": "String",
+      "Default": "t2.small",
+      "AllowedValues": [
+        "t2.small",
+        "t2.medium",
+        "m3.medium",
+        "m3.large",
+        "m3.xlarge",
+        "m3.2xlarge",
+        "c4.large",
+        "c4.xlarge",
+        "c4.2xlarge",
+        "c4.4xlarge",
+        "c4.8xlarge",
+        "c3.large",
+        "c3.xlarge",
+        "c3.2xlarge",
+        "c3.4xlarge",
+        "c3.8xlarge",
+        "r3.large",
+        "r3.xlarge",
+        "r3.2xlarge",
+        "r3.4xlarge",
+        "r3.8xlarge",
+        "i2.xlarge",
+        "i2.2xlarge",
+        "i2.4xlarge",
+        "i2.8xlarge"
+      ],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+    "EmpireVersion": {
+      "Type": "String",
+      "Default": "master",
+      "Description": "Docker tag to specify the version of Empire to run."
+    },
+    "Vpc": {
+      "Type": "AWS::EC2::VPC::Id",
+      "Description": "VPC to deploy into"
+    },
+    "AmiId": {
+      "Type": "AWS::EC2::Image::Id",
+      "Description": "AMI Id. Defaults to the official ECS Optimized Linux.",
+      "Default": "ami-908faaf3"
+    },
+    "KeyName": {
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "Description": "The name of the key pair to use to allow SSH access."
+    },
+    "EventsBackend": {
+      "Type": "String",
+      "Description": "The backend to use to publish Empire events to. Set this to SNS to create an SNS topic and publish events there.",
+      "Default": "sns"
+    },
+    "DockerRegistry": {
+      "Type": "String",
+      "Description": "Docker private registry url",
+      "Default": "https://index.docker.io/v1/"
+    },
+    "DockerUser": {
+      "Type": "String",
+      "Description": "Docker username for private registry",
+      "Default": ""
+    },
+    "DockerPass": {
+      "Type": "String",
+      "Description": "Docker password for private registry",
+      "Default": "",
+      "NoEcho": true
+    },
+    "DockerEmail": {
+      "Type": "String",
+      "Description": "Docker registry email",
+      "Default": ""
+    },
+    "MaxCapacity": {
+      "Type": "String",
+      "Description": "Maximum number of EC2 instances in the auto scaling group",
+      "Default": "5"
+    },
+    "DesiredCapacity": {
+      "Type": "String",
+      "Description": "Desired number of EC2 instances in the auto scaling group",
+      "Default": "3"
+    },
+    "AvailabilityZones": {
+      "Type": "List<AWS::EC2::AvailabilityZone::Name>",
+      "Description": "Comma delimited list of availability zones. MAX 2",
+      "Default": "us-east-1a,us-east-1b"
+    },
+    "LaunchEmpire": {
+      "Type": "Number",
+      "Default": "1",
+      "Description": "If 1, then launch Empire & Postgres as ECS tasks. If anything else, skip launching Empire (intended for dev use when Empire is ran locally)"
+    },
+    "PrivateSubnetID": {
+      "Type": "List<AWS::EC2::Subnet::Id>",
+      "Description": "List of an existing subnet IDs to use for auto scaling group"
+    },
+    "PublicSubnetID": {
+      "Type": "List<AWS::EC2::Subnet::Id>",
+      "Description": "List of an existing subnet IDs to use for the load balancer"
+    },
+    "InstanceSecurityGroups": {
+      "Type": "List<AWS::EC2::SecurityGroup::Id>",
+      "Description": "List of an existing security groups for the ec2 instances (ssh/redis)"
+    },
+    "InternalLoadBalancerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup::Id",
+      "Description": "Internal SG for 80"
+    },
+    "ExternalLoadBalancerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup::Id",
+      "Description": "External SG for 80 443"
+    },
+    "LoadBalancerSecurityGroups": {
+      "Type": "List<AWS::EC2::SecurityGroup::Id>",
+      "Description": "List of an existing security groups for the load balancer instances (80/8080)"
+    }
+  },
+  "Conditions": {
+    "DemoMode": {
+      "Fn::Equals": [
+        {
+          "Ref": "LaunchEmpire"
+        },
+        "1"
+      ]
+    },
+    "DevMode": {
+      "Fn::Not": [
+        {
+          "Condition": "DemoMode"
+        }
+      ]
+    },
+    "SNSEvents": {
+      "Fn::Equals": [
+        {
+          "Ref": "EventsBackend"
+        },
+        "sns"
+      ]
+    }
+  },
+  "Resources": {
+    "LoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Condition": "DemoMode",
+      "Properties": {
+        "SecurityGroups": {
+          "Ref": "LoadBalancerSecurityGroups"
+        },
+        "Subnets": {
+          "Ref": "PublicSubnetID"
+        },
+        "CrossZone": "true",
+        "Listeners": [
+          {
+            "LoadBalancerPort": "80",
+            "InstancePort": "8080",
+            "Protocol": "TCP"
+          }
+        ],
+        "HealthCheck": {
+          "Target": "HTTP:8080/health",
+          "HealthyThreshold": "10",
+          "UnhealthyThreshold": "2",
+          "Interval": "30",
+          "Timeout": "5"
+        }
+      }
+    },
+    "InstanceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Path": "/",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "InstancePolicies": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "ecs",
+        "Roles": [
+          {
+            "Ref": "InstanceRole"
+          }
+        ],
+        "Users": [
+          {
+            "Ref": "User"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "ec2:Describe*",
+                "elasticloadbalancing:*",
+                "ecs:*",
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "iam:ListInstanceProfiles",
+                "iam:ListRoles",
+                "iam:PassRole",
+                "iam:UploadServerCertificate",
+                "iam:DeleteServerCertificate",
+                "route53:*",
+                "sns:*"
+              ],
+              "Resource": [
+                "*"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "ServiceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Path": "/",
+        "AssumeRolePolicyDocument": {
+          "Version": "2008-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ecs.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "ServiceRolePolicies": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "ecsServiceRole",
+        "Roles": [
+          {
+            "Ref": "ServiceRole"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "ec2:Describe*",
+                "elasticloadbalancing:*",
+                "ecs:*",
+                "iam:ListInstanceProfiles",
+                "iam:ListRoles",
+                "iam:PassRole",
+                "route53:*"
+              ],
+              "Resource": [
+                "*"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "InstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {
+            "Ref": "InstanceRole"
+          }
+        ]
+      }
+    },
+    "LaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "DependsOn": "Cluster",
+      "Properties": {
+        "AssociatePublicIpAddress": true,
+        "ImageId": {
+          "Ref": "AmiId"
+        },
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "IamInstanceProfile": {
+          "Ref": "InstanceProfile"
+        },
+        "KeyName": {
+          "Ref": "KeyName"
+        },
+        "SecurityGroups": {
+          "Ref": "InstanceSecurityGroups"
+        },
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash\n",
+                "yum install -y aws-cfn-bootstrap wget\n",
+                "wget https://s3-ap-southeast-2.amazonaws.com/hooroo-certificates/HoorooCA.crt && cp -n HoorooCA.crt /etc/pki/ca-trust/source/anchors/HoorooCA.crt && /usr/bin/update-ca-trust enable && /usr/bin/update-ca-trust extract\n",
+                "echo ECS_CLUSTER=",
+                {
+                  "Ref": "Cluster"
+                },
+                " >> /etc/ecs/ecs.config\n",
+                "echo ECS_ENGINE_AUTH_TYPE=dockercfg >> /etc/ecs/ecs.config\n",
+                "echo ECS_ENGINE_AUTH_DATA=\"{\\\"",
+                {
+                  "Ref": "DockerRegistry"
+                },
+                "\\\":{\\\"auth\\\":\\\"",
+                {
+                  "Fn::Base64": {
+                    "Fn::Join": [
+                      ":",
+                      [
+                        {
+                          "Ref": "DockerUser"
+                        },
+                        {
+                          "Ref": "DockerPass"
+                        }
+                      ]
+                    ]
+                  }
+                },
+                "\\\",\\\"email\\\":\\\"",
+                {
+                  "Ref": "DockerEmail"
+                },
+                "\\\"}}\" >> /etc/ecs/ecs.config\n",
+                "echo \"{\\\"",
+                {
+                  "Ref": "DockerRegistry"
+                },
+                "\\\":{\\\"auth\\\":\\\"",
+                {
+                  "Fn::Base64": {
+                    "Fn::Join": [
+                      ":",
+                      [
+                        {
+                          "Ref": "DockerUser"
+                        },
+                        {
+                          "Ref": "DockerPass"
+                        }
+                      ]
+                    ]
+                  }
+                },
+                "\\\",\\\"email\\\":\\\"",
+                {
+                  "Ref": "DockerEmail"
+                },
+                "\\\"}}\" >> /home/ec2-user/.dockercfg\n"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "AutoScalingGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "MinSize": "1",
+        "MaxSize": {
+          "Ref": "MaxCapacity"
+        },
+        "AvailabilityZones": {
+          "Ref": "AvailabilityZones"
+        },
+        "VPCZoneIdentifier": {
+          "Ref": "PrivateSubnetID"
+        },
+        "LaunchConfigurationName": {
+          "Ref": "LaunchConfiguration"
+        },
+        "DesiredCapacity": {
+          "Ref": "DesiredCapacity"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Empire minion",
+            "PropagateAtLaunch": "true"
+          }
+        ]
+      }
+    },
+    "User": {
+      "Type": "AWS::IAM::User",
+      "Properties": {
+      }
+    },
+    "AccessKey": {
+      "Type": "AWS::IAM::AccessKey",
+      "Properties": {
+        "Status": "Active",
+        "UserName": {
+          "Ref": "User"
+        }
+      }
+    },
+    "Cluster": {
+      "Type": "AWS::ECS::Cluster"
+    },
+    "TaskDefinition": {
+      "Type": "AWS::ECS::TaskDefinition",
+      "Condition": "DemoMode",
+      "Properties": {
+        "ContainerDefinitions": [
+          {
+            "Name": "postgres",
+            "Image": "postgres",
+            "Cpu": 512,
+            "Memory": 256,
+            "EntryPoint": [ ],
+            "Environment": [ ],
+            "Command": [ ],
+            "PortMappings": [
+              {
+                "HostPort": 5432,
+                "ContainerPort": 5432
+              }
+            ],
+            "VolumesFrom": [ ],
+            "Links": [ ],
+            "MountPoints": [ ],
+            "Essential": "true"
+          },
+          {
+            "Name": "empire",
+            "Image": { "Fn::Join": [ ":", [ "remind101/empire", { "Ref": "EmpireVersion" } ] ] },
+            "Cpu": 512,
+            "Memory": 256,
+            "EntryPoint": [ ],
+            "Environment": [
+              {
+                "Name": "AWS_REGION",
+                "Value": "ap-southeast-2"
+              },
+              {
+                "Name": "EMPIRE_DATABASE_URL",
+                "Value": "postgres://postgres:postgres@postgres/postgres?sslmode=disable"
+              },
+              {
+                "Name": "EMPIRE_ECS_CLUSTER",
+                "Value": {
+                  "Ref": "Cluster"
+                }
+              },
+              {
+                "Name": "EMPIRE_ELB_VPC_ID",
+                "Value": { "Ref": "Vpc" }
+              },
+              {
+                "Name": "EMPIRE_ELB_SG_PRIVATE",
+                "Value": { "Ref": "InternalLoadBalancerSecurityGroup" }
+              },
+              {
+                "Name": "EMPIRE_ELB_SG_PUBLIC",
+                "Value": { "Ref": "ExternalLoadBalancerSecurityGroup" }
+              },
+              {
+                "Name": "EMPIRE_ROUTE53_INTERNAL_ZONE_ID",
+                "Value": { "Ref": "InternalDomain" }
+              },
+              {
+                "Name": "EMPIRE_EC2_SUBNETS_PRIVATE",
+                "Value": { "Fn::Join": [ ",", { "Ref": "PrivateSubnetID" } ] }
+              },
+              {
+                "Name": "EMPIRE_ECS_SERVICE_ROLE",
+                "Value": { "Ref": "ServiceRole" }
+              },
+              {
+                "Name": "EMPIRE_EC2_SUBNETS_PUBLIC",
+                "Value": { "Fn::Join": [ ",", { "Ref": "PublicSubnetID" } ] }
+              },
+              {
+                "Name": "EMPIRE_RUN_LOGS_BACKEND",
+                "Value": "stdout"
+              },
+              {
+                "Name": "EMPIRE_EVENTS_BACKEND",
+                "Value": "sns"
+              },
+              {
+                "Name": "EMPIRE_SNS_TOPIC",
+                "Value": { "Ref": "EventsTopic" }
+              }
+            ],
+            "Command": [
+              "server",
+              "-automigrate=true"
+            ],
+            "PortMappings": [
+              {
+                "HostPort": 8080,
+                "ContainerPort": 8080
+              }
+            ],
+            "VolumesFrom": [
+
+            ],
+            "Links": [
+              "postgres:postgres"
+            ],
+            "MountPoints": [
+              {
+                "SourceVolume": "dockerSocket",
+                "ContainerPath": "/var/run/docker.sock",
+                "ReadOnly": false
+              },
+              {
+                "SourceVolume": "dockerCfg",
+                "ContainerPath": "/root/.dockercfg",
+                "ReadOnly": false
+              }
+            ],
+            "Essential": true
+          }
+        ],
+        "Volumes": [
+          {
+            "Name": "dockerSocket",
+            "Host": {
+              "SourcePath": "/var/run/docker.sock"
+            }
+          },
+          {
+            "Name": "dockerCfg",
+            "Host": {
+              "SourcePath": "/home/ec2-user/.dockercfg"
+            }
+          }
+        ]
+      }
+    },
+    "Service": {
+      "Type": "AWS::ECS::Service",
+      "Condition": "DemoMode",
+      "DependsOn": [
+        "Cluster",
+        "ServiceRole",
+        "ServiceRolePolicies"
+      ],
+      "Properties": {
+        "Cluster": {
+          "Ref": "Cluster"
+        },
+        "DesiredCount": 1,
+        "LoadBalancers": [
+          {
+            "ContainerName": "empire",
+            "ContainerPort": 8080,
+            "LoadBalancerName": {
+              "Ref": "LoadBalancer"
+            }
+          }
+        ],
+        "Role": {
+          "Ref": "ServiceRole"
+        },
+        "TaskDefinition": {
+          "Ref": "TaskDefinition"
+        }
+      }
+    },
+    "EventsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Condition": "SNSEvents",
+      "Properties": {
+        "DisplayName": "Empire Events",
+        "TopicName": "events"
+      }
+    }
+  },
+  "Outputs": {
+    "ELBName": {
+      "Description": "The name of the ELB for the Empire controller",
+      "Value": {
+        "Ref": "LoadBalancer"
+      },
+      "Condition": "DemoMode"
+    },
+    "Cluster": {
+      "Description": "Name of the ECS Cluster",
+      "Value": {
+        "Ref": "Cluster"
+      }
+    },
+    "ServiceRole": {
+      "Description": "Role to assume when creating an ECS service with an ELB attached",
+      "Value": {
+        "Ref": "ServiceRole"
+      }
+    },
+    "AccessKeyId": {
+      "Description": "Access key that can be used for a development instance of Empire",
+      "Value": {
+        "Ref": "AccessKey"
+      }
+    },
+    "SecretAccessKey": {
+      "Description": "Access key that can be used for a development instance of Empire",
+      "Value": {
+        "Fn::GetAtt": [
+          "AccessKey",
+          "SecretAccessKey"
+        ]
+      }
+    },
+    "ELBDNSName": {
+      "Description": "The DNS name of the ELB for the Empire controller",
+      "Value": {
+        "Fn::GetAtt": [
+          "LoadBalancer",
+          "DNSName"
+        ]
+      },
+      "Condition": "DemoMode"
+    }
+  }
+}
