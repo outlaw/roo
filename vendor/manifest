@@ -188,6 +188,40 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/docker/docker/opts",
+			"repository": "https://github.com/docker/docker",
+			"revision": "38439733d2415f2d12290bf5bf8b7c1133557f79",
+			"branch": "master",
+			"path": "/opts"
+		},
+		{
+			"importpath": "github.com/docker/docker/pkg/jsonlog",
+			"repository": "https://github.com/docker/docker",
+			"revision": "38439733d2415f2d12290bf5bf8b7c1133557f79",
+			"branch": "master",
+			"path": "/pkg/jsonlog"
+		},
+		{
+			"importpath": "github.com/docker/docker/pkg/jsonmessage",
+			"repository": "https://github.com/docker/docker",
+			"revision": "38439733d2415f2d12290bf5bf8b7c1133557f79",
+			"branch": "master",
+			"path": "/pkg/jsonmessage"
+		},
+		{
+			"importpath": "github.com/docker/docker/pkg/term",
+			"repository": "https://github.com/docker/docker",
+			"revision": "38439733d2415f2d12290bf5bf8b7c1133557f79",
+			"branch": "master",
+			"path": "/pkg/term"
+		},
+		{
+			"importpath": "github.com/docker/go-units",
+			"repository": "https://github.com/docker/go-units",
+			"revision": "5d2041e26a699eaca682e2ea41c8f891e1060444",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/docopt/docopt-go",
 			"repository": "https://github.com/docopt/docopt-go",
 			"revision": "784ddc588536785e7299f7272f39101f7faccc3f",
@@ -248,6 +282,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/mgutz/ansi",
+			"repository": "https://github.com/mgutz/ansi",
+			"revision": "c286dcecd19ff979eeb73ea444e479b903f2cfcb",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/mitchellh/mapstructure",
 			"repository": "https://github.com/mitchellh/mapstructure",
 			"revision": "d2dd0262208475919e1a362f675cfc0e7c10e905",
@@ -258,6 +298,13 @@
 			"repository": "https://github.com/remind101/empire",
 			"revision": "07e736df85e0db222af313d5694716b414ea1b12",
 			"branch": "master"
+		},
+		{
+			"importpath": "github.com/remind101/empire/cmd/emp",
+			"repository": "https://github.com/remind101/empire",
+			"revision": "07e736df85e0db222af313d5694716b414ea1b12",
+			"branch": "master",
+			"path": "/cmd/emp"
 		},
 		{
 			"importpath": "github.com/remind101/empire/cmd/emp/hkclient",

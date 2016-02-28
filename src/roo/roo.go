@@ -4,6 +4,7 @@ import (
   "runtime"
   "time"
   "os"
+  "io"
   "log"
   "net/url"
   "fmt"
@@ -16,16 +17,22 @@ import (
   "github.com/satori/go.uuid"
   "github.com/spf13/viper"
   "github.com/briandowns/spinner"
-  //"github.com/remind101/empire/cmd/emp/hkclient"
+  "github.com/remind101/empire/cmd/emp/hkclient"
   "github.com/remind101/empire/pkg/heroku"
+  "github.com/docker/docker/pkg/jsonmessage"
+  "github.com/docker/docker/pkg/term"
+  "github.com/mgutz/ansi"
 )
 
 var (
   flagApp   string
   client    *heroku.Client
+  nrc       *hkclient.NetRc
   hkAgent   = "hk/" + "0.0.1" + " (" + runtime.GOOS + "; " + runtime.GOARCH + ")"
   userAgent = hkAgent + " " + heroku.DefaultUserAgent
+  apiURL    = ""
 )
+
 func appBasedFlags() *[]cli.Flag {
     return &[]cli.Flag{
       cli.StringFlag{
@@ -52,18 +59,25 @@ func main() {
   viper.BindEnv("lockbox_s3_path")
   viper.BindEnv("env_s3_path")
 
+  viper.SetDefault("api_url", os.Getenv("EMPIRE_API_URL"))
+
   viper.SetDefault("lockbox_s3_path", "s3://hooroo-lockbox")
   viper.SetDefault("lockbox_master_key", viper.GetString("env_master_key"))
   viper.SetDefault("env_s3_path", "s3://hooroo-test")
+
+  apiURL = viper.GetString("api_url")
+  os.Setenv("EMPIRE_API_URL", apiURL)
+
+  initClients()
 
   app.Commands = []cli.Command{
   {
 // deploy
     Name:  "deploy",
-    Usage: "Deploy an application",
+    Usage: "[deploy uri] Deploy an image to an application",
     Flags:  *appBasedFlags(),
     Action: func(c *cli.Context) {
-      println("deploy: ")
+      runDeploy(c.String("app"), c.Args().First())
     },
   },
   {
@@ -235,4 +249,89 @@ func gSpinner(text string) *spinner.Spinner {
   s.Start()
 
   return s;
+}
+
+type PostDeployForm struct {
+  Image string `json:"image"`
+}
+
+func runDeploy(appName string, image string) {
+  r, w := io.Pipe()
+
+  form := &PostDeployForm{Image: image}
+
+  var endpoint string
+  if appName != "" {
+    endpoint = fmt.Sprintf("/apps/%s/deploys", appName)
+  } else {
+    endpoint = "/deploys"
+  }
+
+  go func() {
+    must(client.Post(w, endpoint, form))
+    must(w.Close())
+  }()
+
+  outFd, isTerminalOut := term.GetFdInfo(os.Stdout)
+  must(jsonmessage.DisplayJSONMessagesStream(r, os.Stdout, outFd, isTerminalOut))
+}
+
+func must(err error) {
+  if err != nil {
+    if herror, ok := err.(heroku.Error); ok {
+      switch herror.Id {
+      case "two_factor":
+        printError(err.Error() + " Authorize with `emp authorize`.")
+        os.Exit(79)
+      case "unauthorized":
+        printFatal(err.Error() + " Log in with `emp login`.")
+      }
+    }
+    printFatal(err.Error())
+  }
+}
+
+func printError(message string, args ...interface{}) {
+  log.Println(colorizeMessage("red", "error:", message, args...))
+}
+
+func printFatal(message string, args ...interface{}) {
+  log.Fatal(colorizeMessage("red", "error:", message, args...))
+}
+
+func printWarning(message string, args ...interface{}) {
+  log.Println(colorizeMessage("yellow", "warning:", message, args...))
+}
+
+func colorizeMessage(color, prefix, message string, args ...interface{}) string {
+  prefResult := ""
+  if prefix != "" {
+    prefResult = ansi.Color(prefix, color+"+b") + " " + ansi.ColorCode("reset")
+  }
+  return prefResult + ansi.Color(fmt.Sprintf(message, args...), color) + ansi.ColorCode("reset")
+}
+
+func initClients() {
+  loadNetrc()
+  suite, err := hkclient.New(nrc, hkAgent)
+  if err != nil {
+    printFatal(err.Error())
+  }
+
+  client = suite.Client
+  apiURL = suite.ApiURL
+}
+
+func loadNetrc() {
+  var err error
+
+  if nrc == nil {
+    if nrc, err = hkclient.LoadNetRc(); err != nil {
+      if os.IsNotExist(err) {
+        nrc = &hkclient.NetRc{}
+        return
+      }
+      printFatal("loading netrc: " + err.Error())
+    }
+  }
 }
