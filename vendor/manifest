@@ -2,9 +2,29 @@
 	"version": 0,
 	"dependencies": [
 		{
+			"importpath": "code.google.com/p/go-uuid/uuid",
+			"repository": "https://code.google.com/p/go-uuid",
+			"revision": "35bc42037350",
+			"branch": "default",
+			"path": "/uuid"
+		},
+		{
+			"importpath": "code.google.com/p/goauth2/oauth",
+			"repository": "https://code.google.com/p/goauth2",
+			"revision": "222e66a2882e",
+			"branch": "default",
+			"path": "/oauth"
+		},
+		{
 			"importpath": "github.com/BurntSushi/toml",
 			"repository": "https://github.com/BurntSushi/toml",
 			"revision": "a4eecd407cf4129fc902ece859a0114e4cf1a7f4",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/Sirupsen/logrus",
+			"repository": "https://github.com/Sirupsen/logrus",
+			"revision": "219c8cb75c258c552e999735be6df753ffc7afdc",
 			"branch": "master"
 		},
 		{
@@ -49,6 +69,41 @@
 			"path": "/private/waiter"
 		},
 		{
+			"importpath": "github.com/aws/aws-sdk-go/service/cloudwatchlogs",
+			"repository": "https://github.com/aws/aws-sdk-go",
+			"revision": "aac89266a9bc98ecbf440bb675e9dc95a94d8dc6",
+			"branch": "master",
+			"path": "/service/cloudwatchlogs"
+		},
+		{
+			"importpath": "github.com/aws/aws-sdk-go/service/ecr",
+			"repository": "https://github.com/aws/aws-sdk-go",
+			"revision": "aac89266a9bc98ecbf440bb675e9dc95a94d8dc6",
+			"branch": "master",
+			"path": "/service/ecr"
+		},
+		{
+			"importpath": "github.com/aws/aws-sdk-go/service/ecs",
+			"repository": "https://github.com/aws/aws-sdk-go",
+			"revision": "aac89266a9bc98ecbf440bb675e9dc95a94d8dc6",
+			"branch": "master",
+			"path": "/service/ecs"
+		},
+		{
+			"importpath": "github.com/aws/aws-sdk-go/service/elb",
+			"repository": "https://github.com/aws/aws-sdk-go",
+			"revision": "aac89266a9bc98ecbf440bb675e9dc95a94d8dc6",
+			"branch": "master",
+			"path": "/service/elb"
+		},
+		{
+			"importpath": "github.com/aws/aws-sdk-go/service/kinesis",
+			"repository": "https://github.com/aws/aws-sdk-go",
+			"revision": "aac89266a9bc98ecbf440bb675e9dc95a94d8dc6",
+			"branch": "master",
+			"path": "/service/kinesis"
+		},
+		{
 			"importpath": "github.com/aws/aws-sdk-go/service/kms",
 			"repository": "https://github.com/aws/aws-sdk-go",
 			"revision": "aac89266a9bc98ecbf440bb675e9dc95a94d8dc6",
@@ -56,11 +111,44 @@
 			"path": "/service/kms"
 		},
 		{
+			"importpath": "github.com/aws/aws-sdk-go/service/route53",
+			"repository": "https://github.com/aws/aws-sdk-go",
+			"revision": "aac89266a9bc98ecbf440bb675e9dc95a94d8dc6",
+			"branch": "master",
+			"path": "/service/route53"
+		},
+		{
 			"importpath": "github.com/aws/aws-sdk-go/service/s3",
 			"repository": "https://github.com/aws/aws-sdk-go",
 			"revision": "aac89266a9bc98ecbf440bb675e9dc95a94d8dc6",
 			"branch": "master",
 			"path": "/service/s3"
+		},
+		{
+			"importpath": "github.com/aws/aws-sdk-go/service/sns",
+			"repository": "https://github.com/aws/aws-sdk-go",
+			"revision": "aac89266a9bc98ecbf440bb675e9dc95a94d8dc6",
+			"branch": "master",
+			"path": "/service/sns"
+		},
+		{
+			"importpath": "github.com/bgentry/go-netrc/netrc",
+			"repository": "https://github.com/bgentry/go-netrc",
+			"revision": "9fd32a8b3d3d3f9d43c341bfe098430e07609480",
+			"branch": "master",
+			"path": "/netrc"
+		},
+		{
+			"importpath": "github.com/bgentry/pflag",
+			"repository": "https://github.com/bgentry/pflag",
+			"revision": "b008717215c7236e20ca2faaf805e54ba6c1d208",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/bgentry/speakeasy",
+			"repository": "https://github.com/bgentry/speakeasy",
+			"revision": "36e9cfdd690967f4f690c6edcc9ffacd006014a0",
+			"branch": "master"
 		},
 		{
 			"importpath": "github.com/briandowns/spinner",
@@ -81,11 +169,23 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/codegangsta/negroni",
+			"repository": "https://github.com/codegangsta/negroni",
+			"revision": "c7477ad8e330bef55bf1ebe300cf8aa67c492d1b",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/coreos/go-etcd/etcd",
 			"repository": "https://github.com/coreos/go-etcd",
 			"revision": "003851be7bb0694fe3cc457a49529a19388ee7cf",
 			"branch": "master",
 			"path": "/etcd"
+		},
+		{
+			"importpath": "github.com/dgrijalva/jwt-go",
+			"repository": "https://github.com/dgrijalva/jwt-go",
+			"revision": "f2193411bd642f7db03249fd79d5292c9b34916a",
+			"branch": "master"
 		},
 		{
 			"importpath": "github.com/docopt/docopt-go",
@@ -152,6 +252,26 @@
 			"repository": "https://github.com/mitchellh/mapstructure",
 			"revision": "d2dd0262208475919e1a362f675cfc0e7c10e905",
 			"branch": "master"
+		},
+		{
+			"importpath": "github.com/remind101/empire",
+			"repository": "https://github.com/remind101/empire",
+			"revision": "07e736df85e0db222af313d5694716b414ea1b12",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/remind101/empire/cmd/emp/hkclient",
+			"repository": "https://github.com/remind101/empire",
+			"revision": "07e736df85e0db222af313d5694716b414ea1b12",
+			"branch": "master",
+			"path": "/cmd/emp/hkclient"
+		},
+		{
+			"importpath": "github.com/remind101/empire/pkg/heroku",
+			"repository": "https://github.com/remind101/empire",
+			"revision": "07e736df85e0db222af313d5694716b414ea1b12",
+			"branch": "master",
+			"path": "/pkg/heroku"
 		},
 		{
 			"importpath": "github.com/satori/go.uuid",

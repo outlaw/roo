@@ -1,6 +1,7 @@
 package main
 
 import (
+  "runtime"
   "time"
   "os"
   "log"
@@ -15,8 +16,16 @@ import (
   "github.com/satori/go.uuid"
   "github.com/spf13/viper"
   "github.com/briandowns/spinner"
+  //"github.com/remind101/empire/cmd/emp/hkclient"
+  "github.com/remind101/empire/pkg/heroku"
 )
 
+var (
+  flagApp   string
+  client    *heroku.Client
+  hkAgent   = "hk/" + "0.0.1" + " (" + runtime.GOOS + "; " + runtime.GOARCH + ")"
+  userAgent = hkAgent + " " + heroku.DefaultUserAgent
+)
 func appBasedFlags() *[]cli.Flag {
     return &[]cli.Flag{
       cli.StringFlag{
@@ -48,6 +57,15 @@ func main() {
   viper.SetDefault("env_s3_path", "s3://hooroo-test")
 
   app.Commands = []cli.Command{
+  {
+// deploy
+    Name:  "deploy",
+    Usage: "Deploy an application",
+    Flags:  *appBasedFlags(),
+    Action: func(c *cli.Context) {
+      println("deploy: ")
+    },
+  },
   {
 // env
     Name:  "env",

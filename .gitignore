@@ -1,0 +1,4 @@
+bin/
+release/
+pkg/
+vendor/src
