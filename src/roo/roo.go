@@ -21,7 +21,6 @@ import (
   "github.com/remind101/empire/pkg/heroku"
   "github.com/docker/docker/pkg/jsonmessage"
   "github.com/docker/docker/pkg/term"
-  "github.com/mgutz/ansi"
 )
 
 var (
@@ -31,6 +30,11 @@ var (
   hkAgent   = "hk/" + "0.0.1" + " (" + runtime.GOOS + "; " + runtime.GOARCH + ")"
   userAgent = hkAgent + " " + heroku.DefaultUserAgent
   apiURL    = ""
+
+  // Create
+  flagRegion string
+  flagOrgName string
+  flagHTTPGit bool
 )
 
 func appBasedFlags() *[]cli.Flag {
@@ -68,15 +72,24 @@ func main() {
   apiURL = viper.GetString("api_url")
   os.Setenv("EMPIRE_API_URL", apiURL)
 
-  initClients()
-
   app.Commands = []cli.Command{
+  {
+// create
+    Name:  "create",
+    Usage: "[create] Create an application",
+    Flags:  *appBasedFlags(),
+    Action: func(c *cli.Context) {
+      initClients()
+      runCreate(c.String("app"))
+    },
+  },
   {
 // deploy
     Name:  "deploy",
     Usage: "[deploy uri] Deploy an image to an application",
     Flags:  *appBasedFlags(),
     Action: func(c *cli.Context) {
+      initClients()
       runDeploy(c.String("app"), c.Args().First())
     },
   },
@@ -276,41 +289,6 @@ func runDeploy(appName string, image string) {
   must(jsonmessage.DisplayJSONMessagesStream(r, os.Stdout, outFd, isTerminalOut))
 }
 
-func must(err error) {
-  if err != nil {
-    if herror, ok := err.(heroku.Error); ok {
-      switch herror.Id {
-      case "two_factor":
-        printError(err.Error() + " Authorize with `emp authorize`.")
-        os.Exit(79)
-      case "unauthorized":
-        printFatal(err.Error() + " Log in with `emp login`.")
-      }
-    }
-    printFatal(err.Error())
-  }
-}
-
-func printError(message string, args ...interface{}) {
-  log.Println(colorizeMessage("red", "error:", message, args...))
-}
-
-func printFatal(message string, args ...interface{}) {
-  log.Fatal(colorizeMessage("red", "error:", message, args...))
-}
-
-func printWarning(message string, args ...interface{}) {
-  log.Println(colorizeMessage("yellow", "warning:", message, args...))
-}
-
-func colorizeMessage(color, prefix, message string, args ...interface{}) string {
-  prefResult := ""
-  if prefix != "" {
-    prefResult = ansi.Color(prefix, color+"+b") + " " + ansi.ColorCode("reset")
-  }
-  return prefResult + ansi.Color(fmt.Sprintf(message, args...), color) + ansi.ColorCode("reset")
-}
-
 func initClients() {
   loadNetrc()
   suite, err := hkclient.New(nrc, hkAgent)
@@ -334,4 +312,38 @@ func loadNetrc() {
       printFatal("loading netrc: " + err.Error())
     }
   }
+}
+
+func runCreate(appname string) {
+  var opts heroku.OrganizationAppCreateOpts
+  if appname != "" {
+    opts.Name = &appname
+  }
+  if flagOrgName == "personal" { // "personal" means "no org"
+    personal := true
+    opts.Personal = &personal
+  } else if flagOrgName != "" {
+    opts.Organization = &flagOrgName
+  }
+  if flagRegion != "" {
+    opts.Region = &flagRegion
+  }
+
+  app, err := client.OrganizationAppCreate(&opts)
+  must(err)
+
+  //addGitRemote(app, flagHTTPGit)
+
+  if app.Organization != nil {
+    log.Printf("Created %s in the %s org.", app.Name, app.Organization.Name)
+  } else {
+    log.Printf("Created %s.", app.Name)
+  }
+  runDomainAdd(appname)
+}
+
+func runDomainAdd(appname string) {
+  _, err := client.DomainCreate(appname, appname)
+  must(err)
+  log.Printf("Added %s to %s.", appname, appname)
 }
