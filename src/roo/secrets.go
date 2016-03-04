@@ -111,11 +111,11 @@ var cmdEnv = cli.Command {
         path, err := calculateEnvBucket(c.String("app"), c.String("environment"))
         if err != nil { log.Fatal(err) }
 
-        manager   := envManager(path)
+        manager     := envManager(path)
         actual, err := manager.Download([]string{c.Args().First()});
-
         if err != nil { log.Fatal(err) }
-        out.Write(actual[path])
+
+        out.Write(actual[c.Args().First()])
       },
     },
     {
@@ -123,13 +123,12 @@ var cmdEnv = cli.Command {
       Usage: "[ls] List the environment variables for this app",
       Flags:  *appBasedFlags(),
       Action: func(c *cli.Context) {
-        //path, err := calculateEnvBucket(c.String("app"), c.String("environment"))
-        //if err != nil { log.Fatal(err) }
+        path, err := calculateEnvBucket(c.String("app"), c.String("environment"))
+        if err != nil { log.Fatal(err) }
 
-        manager    := envManager(viper.GetString("env_s3_path"))
+        manager    := envManager(path)
         files, err := manager.List("*")
         if err != nil { log.Fatal(err) }
-        fmt.Printf("%s", files)
 
         for _, f := range files {
           fmt.Printf("%s\n", f.Path)
@@ -152,13 +151,16 @@ func lockboxManager() SecretManager {
 }
 
 func envManager(context string) SecretManager {
-  fmt.Println(context)
   return createManager(context, viper.GetString("env_master_key"))
 }
 
 func createManager(s3Url string, keyId string) SecretManager {
   u, err := url.Parse(s3Url)
   if err != nil { log.Fatalf("bad s3Url: %s", err) }
+
+  if u.Path != "" && u.Path[0] == '/' {
+    u.Path = u.Path[1:]
+  }
 
   ctxt, err := parseContext(os.Getenv("SNEAKER_MASTER_CONTEXT"))
   if err != nil { log.Fatalf("bad SNEAKER_MASTER_CONTEXT: %s", err) }
