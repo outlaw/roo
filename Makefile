@@ -9,9 +9,16 @@ build: deps compile
 compile: 
 	GOOS=linux GOARCH=amd64 gb build && \
 	GOOS=darwin GOARCH=amd64 gb build
+
 release: compile
-	tar czvf release/${APP}-darwin-x86_64.tar.gz bin/${APP}-darwin-amd64 && \
-	tar czvf release/${APP}-linux-x86_64.tar.gz bin/${APP}-linux-amd64
+	mkdir -p ./tmp && \
+	cp bin/* tmp && \
+	mv ./tmp/${APP}-darwin-amd64 ./tmp/${APP} && \
+	tar -czv -C tmp -f release/${APP}-darwin-x86_64.tar.gz ${APP} && \
+	rm -rf tmp/${APP} && \
+	mv ./tmp/${APP}-linux-amd64 ./tmp/${APP} && \
+	tar -czv -C tmp -f release/${APP}-linux-x86_64.tar.gz ${APP} && \
+	rm -rf ./tmp
 
 publish:
 	aws s3 cp release/roo-linux-x86_64.tar.gz s3://hooroo-builds/roo/latest/roo-linux-x86_64.tar.gz && \
