@@ -6,7 +6,6 @@ import (
   "io"
   "log"
   "fmt"
-  "strings"
   "github.com/codegangsta/cli"
   "github.com/spf13/viper"
   "github.com/remind101/empire/cmd/emp/hkclient"
@@ -50,6 +49,9 @@ func main() {
   app.Name = "roo"
   app.Usage = ""
 
+  viper.BindEnv("AWS_REGION")
+  viper.SetDefault("AWS_REGION", "ap-southeast-2")
+
   viper.SetEnvPrefix("roo")
   viper.AutomaticEnv()
   viper.BindEnv("lockbox_s3_path")
@@ -57,6 +59,7 @@ func main() {
 
   viper.SetDefault("api_url", os.Getenv("EMPIRE_API_URL"))
 
+  viper.SetDefault("env_master_key", "alias/roo")
   viper.SetDefault("lockbox_s3_path", "s3://hooroo-lockbox")
   viper.SetDefault("lockbox_master_key", viper.GetString("env_master_key"))
   viper.SetDefault("env_s3_path", "s3://hooroo-test")
@@ -90,22 +93,6 @@ func main() {
   }
 
   app.Run(os.Args)
-}
-
-func parseContext(s string) (map[string]string, error) {
-  if s == "" {
-    return nil, nil
-  }
-
-  context := map[string]string{}
-  for _, v := range strings.Split(s, ",") {
-    parts := strings.SplitN(v, "=", 2)
-    if len(parts) != 2 {
-      return nil, fmt.Errorf("unable to parse context: %q", v)
-    }
-    context[parts[0]] = parts[1]
-  }
-  return context, nil
 }
 
 func openPath(file string, o func(string) (*os.File, error), def *os.File) *os.File {

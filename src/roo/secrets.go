@@ -9,6 +9,7 @@ import (
   "fmt"
   "github.com/codegangsta/cli"
   "github.com/codahale/sneaker"
+  "github.com/aws/aws-sdk-go/aws"
   "github.com/aws/aws-sdk-go/service/kms"
   "github.com/aws/aws-sdk-go/aws/session"
   "github.com/aws/aws-sdk-go/service/s3"
@@ -154,6 +155,26 @@ func envManager(context string) SecretManager {
   return createManager(context, viper.GetString("env_master_key"))
 }
 
+func parseContext(s string) (map[string]string, error) {
+  if s == "" {
+    return nil, nil
+  }
+
+  context := map[string]string{}
+  keys    := []string{"application", "environment"}
+  values  := strings.Split(s, "/")
+  fmt.Println(values)
+
+  if len(values) >= 2 {
+    context[keys[0]] = values[0]
+    context[keys[1]] = values[1]
+  } else {
+    return nil, fmt.Errorf("unable to parse context: %q", values)
+  }
+
+  return context, nil
+}
+
 func createManager(s3Url string, keyId string) SecretManager {
   u, err := url.Parse(s3Url)
   if err != nil { log.Fatalf("bad s3Url: %s", err) }
@@ -162,14 +183,16 @@ func createManager(s3Url string, keyId string) SecretManager {
     u.Path = u.Path[1:]
   }
 
-  ctxt, err := parseContext(os.Getenv("SNEAKER_MASTER_CONTEXT"))
-  if err != nil { log.Fatalf("bad SNEAKER_MASTER_CONTEXT: %s", err) }
+  ctxt, err := parseContext(u.Path)
+  if err != nil { log.Fatalf("bad encryption context: %s", err) }
 
   session := session.New()
+
+  config := &aws.Config{Region: aws.String(viper.GetString("AWS_REGION"))}
   return &sneaker.Manager{
-    Objects: s3.New(session),
+    Objects: s3.New(session, config),
     Envelope: sneaker.Envelope{
-      KMS: kms.New(session),
+      KMS: kms.New(session, config),
     },
     Bucket:            u.Host,
     Prefix:            u.Path,
