@@ -1,7 +1,13 @@
-
 # 🐙 Roo 
 
 ## Install
+
+### Installer Script
+```
+curl https://raw.githubusercontent.com/outlaw/roo/master/install.sh | sh
+```
+
+### Homebrew
 ```
 brew tap outlaw/homebrew-tap
 brew install outlaw/homebrew-tap/roo
