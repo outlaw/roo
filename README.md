@@ -28,6 +28,18 @@ To Retrieve:
 roo env get --application my-app --environment production SECRET_ENVIRONMENT_VARIABLE
 ```
 
+Pairing Roo and a gem like [Dotenv](https://github.com/bkeepers/dotenv) makes life a breeze. 
+
+```
+cat .env.production
+SECRET_ENVIRONMENT_VARIABLE=$(roo env get --application my-app --environment production SECRET_ENVIRONMENT_VARIABLE)
+```
+
+```
+cat .env.test
+SECRET_ENVIRONMENT_VARIABLE=test_value
+```
+
 Simples!
 
 ### Other
