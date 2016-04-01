@@ -30,14 +30,19 @@ roo env get --application my-app --environment production SECRET_ENVIRONMENT_VAR
 
 Pairing Roo and a gem like [Dotenv](https://github.com/bkeepers/dotenv) makes life a breeze. 
 
+##### .env.production
 ```
-cat .env.production
 SECRET_ENVIRONMENT_VARIABLE=$(roo env get --application my-app --environment production SECRET_ENVIRONMENT_VARIABLE)
 ```
 
+##### .env.test
 ```
-cat .env.test
-SECRET_ENVIRONMENT_VARIABLE=test_value
+SECRET_ENVIRONMENT_VARIABLE="test_value"
+```
+
+##### .env
+```
+SECRET_ENVIRONMENT_VARIABLE="Some development value"
 ```
 
 Simples!
